@@ -7,6 +7,12 @@ CREATE TABLE IF NOT EXISTS recipes (
   timing JSONB,
   techniques JSONB,
   transcript TEXT,
+  -- New video-related fields
+  video_url TEXT,
+  language TEXT DEFAULT 'en',
+  cuisine_type TEXT,
+  difficulty TEXT CHECK (difficulty IN ('easy', 'medium', 'hard')),
+  frames JSONB DEFAULT '[]',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

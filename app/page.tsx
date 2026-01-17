@@ -70,21 +70,41 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 mb-16">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Mic className="h-5 w-5 text-primary" />
-                  Chef Recording
+                  Audio Recording
                 </CardTitle>
                 <CardDescription>
-                  Narrate your recipe while cooking and let AI structure it for you
+                  Quick audio recording - narrate and let AI structure it
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Link href="/record">
                   <Button className="w-full" size="lg">
-                    Start Recording
+                    Start Audio
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow border-primary/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  Video Recording
+                  <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">New</span>
+                </CardTitle>
+                <CardDescription>
+                  Full video with AI photo extraction at key moments
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/record-video">
+                  <Button className="w-full" size="lg" variant="default">
+                    Start Video
                   </Button>
                 </Link>
               </CardContent>
@@ -110,7 +130,7 @@ export default function HomePage() {
 
           <div>
             <h2 className="text-3xl font-bold mb-6">Recipe Library</h2>
-            
+
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

@@ -31,7 +31,20 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, ingredients, steps, timing, techniques, transcript } = body
+    const {
+      title,
+      ingredients,
+      steps,
+      timing,
+      techniques,
+      transcript,
+      // New video-related fields
+      video_url,
+      language,
+      cuisine_type,
+      difficulty,
+      frames
+    } = body
 
     // Validate required fields
     if (!title || !ingredients || !steps) {
@@ -50,6 +63,11 @@ export async function POST(request: NextRequest) {
         timing,
         techniques,
         transcript,
+        video_url,
+        language,
+        cuisine_type,
+        difficulty,
+        frames
       })
       .select()
       .single()
