@@ -69,9 +69,13 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
 
   // scroll to top when step changes
   useEffect(() => {
+    console.log('[CookPage] currentStep changed to:', currentStep)
     const element = document.getElementById('current-step-card')
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Small timeout to ensure DOM update is processed (though React is usually fast enough)
+      setTimeout(() => {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
     }
   }, [currentStep])
 
@@ -91,12 +95,14 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
   }
 
   const handleStepChange = useCallback((newStep: number) => {
+    console.log('[CookPage] handleStepChange called with:', newStep)
     if (recipe && newStep >= 0 && newStep < recipe.steps.length) {
       // 1. Cancel any existing system speech immediately
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel()
       }
 
+      console.log('[CookPage] Setting current step to:', newStep)
       setCurrentStep(newStep)
 
       // 2. Only speak using system voice if the ElevenLabs assistant isn't likely handling it
@@ -107,6 +113,8 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
         )
         speechSynthesis.speak(utterance)
       }
+    } else {
+      console.warn('[CookPage] Step change ignored. recipe exists?', !!recipe, 'valid step?', newStep >= 0 && newStep < (recipe?.steps?.length || 0))
     }
   }, [recipe])
 

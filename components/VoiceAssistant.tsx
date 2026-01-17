@@ -36,14 +36,20 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
   // Ref to track source of step change to prevent double-speaking or loops
   const lastChangeSource = useRef<'user' | 'agent'>('user')
 
-  // Ref to track current step for tools to avoid stale closures
+  // Ref to track callbacks and recipe to avoid stale closures in tools
   const currentStepRef = useRef(currentStep)
+  const onStepChangeRef = useRef(onStepChange)
+  const onTimerRequestRef = useRef(onTimerRequest)
+  const recipeRef = useRef(recipe)
 
-  // Keep step ref in sync
+  // Keep refs in sync with props
   useEffect(() => {
+    onStepChangeRef.current = onStepChange
+    onTimerRequestRef.current = onTimerRequest
+    recipeRef.current = recipe
     console.log(`[VoiceAssistant] Step changed: ${currentStepRef.current} -> ${currentStep}`)
     currentStepRef.current = currentStep
-  }, [currentStep])
+  }, [currentStep, onStepChange, onTimerRequest, recipe])
 
   // Define client tools that the agent can call
   const clientTools = useMemo(() => ({
@@ -51,9 +57,12 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
       console.log('Tool called: nextStep')
       lastChangeSource.current = 'agent'
       const step = currentStepRef.current
-      if (step < recipe.steps.length - 1) {
-        onStepChange(step + 1)
-        return 'Moved to next step'
+      const r = recipeRef.current
+
+      if (step < r.steps.length - 1) {
+        const nextIndex = step + 1
+        onStepChangeRef.current(nextIndex)
+        return `Moved to step ${nextIndex + 1}. The instruction is: ${r.steps[nextIndex]}`
       }
       return 'Already at the last step'
     },
@@ -61,36 +70,66 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
       console.log('Tool called: previousStep')
       lastChangeSource.current = 'agent'
       const step = currentStepRef.current
+      const r = recipeRef.current
+
       if (step > 0) {
-        onStepChange(step - 1)
-        return 'Moved to previous step'
+        const prevIndex = step - 1
+        onStepChangeRef.current(prevIndex)
+        return `Moved to step ${prevIndex + 1}. The instruction is: ${r.steps[prevIndex]}`
       }
       return 'Already at the first step'
     },
     repeatStep: () => {
       console.log('Tool called: repeatStep')
       const step = currentStepRef.current
-      // Trigger re-announcement of current step
-      onStepChange(step)
-      return `Repeating step ${step + 1}`
+      const r = recipeRef.current
+      // Trigger re-announcement
+      onStepChangeRef.current(step)
+      return `Staying on step ${step + 1}. The instruction is: ${r.steps[step]}`
     },
     setTimer: ({ minutes }: { minutes: number }) => {
       console.log('Tool called: setTimer with minutes:', minutes)
-      onTimerRequest(minutes, `Step ${currentStepRef.current + 1}`)
+      onTimerRequestRef.current(minutes, `Step ${currentStepRef.current + 1}`)
       return `Timer set for ${minutes} minutes`
     },
-    jumpToStep: ({ step }: { step: number }) => {
-      console.log('Tool called: jumpToStep with step:', step)
+    jumpToStep: (payload: any) => {
+      console.log('Tool called: jumpToStep | Raw payload:', JSON.stringify(payload))
+
+      let step: number | undefined
+
+      if (typeof payload === 'number') {
+        step = payload
+      } else if (typeof payload === 'object' && payload !== null) {
+        if (typeof payload.step === 'number') step = payload.step
+        else if (typeof payload.step === 'string') step = parseInt(payload.step, 10)
+      } else if (typeof payload === 'string') {
+        step = parseInt(payload, 10)
+      }
+
+      console.log('Parsed step number:', step)
+
+      if (step === undefined || isNaN(step)) {
+        console.warn('Invalid jumpToStep payload:', payload)
+        return 'Error: Invalid step number provided.'
+      }
+
       lastChangeSource.current = 'agent'
+      const r = recipeRef.current
+      if (!r || !r.steps) {
+        console.warn('Recipe not ready in VoiceAssistant ref')
+        return 'Error: Recipe data not loaded yet.'
+      }
 
       const targetIndex = step - 1
-      if (targetIndex >= 0 && targetIndex < recipe.steps.length) {
-        onStepChange(targetIndex)
-        return `Moved to step ${step}`
+      if (targetIndex >= 0 && targetIndex < r.steps.length) {
+        console.log(`Executing jump to index ${targetIndex}`)
+        onStepChangeRef.current(targetIndex)
+        // Return the actual text of the step so the AI knows what to read
+        return `Moved to step ${step}. The instruction is: ${r.steps[targetIndex]}`
       }
-      return `Step ${step} does not exist. Please specify a step between 1 and ${recipe.steps.length}`
+      return `Step ${step} does not exist. Please specify a step between 1 and ${r.steps.length}`
     }
-  }), [recipe, currentStep, onStepChange, onTimerRequest])
+  }), []) // Empty dependency array allows stable tool definitions. Refs provide dynamic data.
 
   const recipeContext = useMemo(() => {
     // We provide the FULL recipe context initially.
@@ -135,8 +174,10 @@ ${techniquesList}
 - nextStep(): Move to next step
 - previousStep(): Move to previous step
 - repeatStep(): Read current step again
-- jumpToStep({ step: number }): DIRECTLY jump to a specific step number. Example: call jumpToStep with argument { "step": 3 } to go to step 3.
-- setTimer({ minutes: number }): Start a timer
+- jumpToStep({ "step": number }): DIRECTLY jump to a specific step number. 
+  - Example: To go to step 3, call: jumpToStep({ "step": 3 })
+  - ALWAYS use this tool if the user mentions a specific step number.
+- setTimer({ "minutes": number }): Start a timer
 
 When you move to a new step (via any tool), the tool will return the text of that step. READ that text to the user naturally.`
   }, [recipe])
