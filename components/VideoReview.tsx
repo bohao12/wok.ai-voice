@@ -44,11 +44,7 @@ interface RecipeData {
     techniques?: string[]
 }
 
-interface RecipeMetadata {
-    cuisineType: string
-    difficulty: 'easy' | 'medium' | 'hard'
-    language: string
-}
+
 
 interface VideoReviewProps {
     recipe: RecipeData
@@ -56,10 +52,8 @@ interface VideoReviewProps {
     videoUrl: string
     frames: ExtractedFrame[]
     keyMoments: KeyMoment[]
-    metadata: RecipeMetadata
     onFramesUpdate: (frames: ExtractedFrame[]) => void
     onRecipeUpdate: (recipe: RecipeData) => void
-    onMetadataUpdate: (metadata: RecipeMetadata) => void
     onPublish: () => void
     onStartOver: () => void
 }
@@ -70,10 +64,8 @@ export function VideoReview({
     videoUrl,
     frames,
     keyMoments,
-    metadata,
     onFramesUpdate,
     onRecipeUpdate,
-    onMetadataUpdate,
     onPublish,
     onStartOver
 }: VideoReviewProps) {
@@ -145,10 +137,7 @@ export function VideoReview({
                         )}
                     </div>
                     <div className="flex gap-2 pt-2 flex-wrap">
-                        {metadata.cuisineType && (
-                            <Badge variant="secondary">{metadata.cuisineType}</Badge>
-                        )}
-                        <Badge variant="secondary" className="capitalize">{metadata.difficulty}</Badge>
+
                         {recipe.timing && (
                             <Badge variant="secondary">
                                 <Clock className="mr-1 h-3 w-3" />

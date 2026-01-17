@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { VideoRecorder } from '@/components/VideoRecorder'
 import { VideoUploader } from '@/components/VideoUploader'
 import { VideoReview } from '@/components/VideoReview'
-import { RecipeMetadataForm } from '@/components/RecipeMetadataForm'
+
 import { VideoAnalyzer } from '@/components/TranscriptEditor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,11 +48,7 @@ interface RecipeData {
     techniques?: string[]
 }
 
-interface RecipeMetadata {
-    cuisineType: string
-    difficulty: 'easy' | 'medium' | 'hard'
-    language: string
-}
+
 
 type RecordingStep = 'setup' | 'transcribe' | 'analyzing' | 'review' | 'published'
 type InputMode = 'record' | 'upload'
@@ -78,11 +74,7 @@ export default function RecordVideoPage() {
     const [keyMoments, setKeyMoments] = useState<KeyMoment[]>([])
     const [extractedFrames, setExtractedFrames] = useState<ExtractedFrame[]>([])
     const [recipe, setRecipe] = useState<RecipeData | null>(null)
-    const [metadata, setMetadata] = useState<RecipeMetadata>({
-        cuisineType: '',
-        difficulty: 'medium',
-        language: 'en'
-    })
+
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analysisProgress, setAnalysisProgress] = useState('')
     const [error, setError] = useState<string | null>(null)
@@ -228,12 +220,7 @@ export default function RecordVideoPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...recipe,
-                    transcript,
-                    // video_url omitted - video not stored
-                    language,
-                    cuisine_type: metadata.cuisineType,
-                    difficulty: metadata.difficulty
-                    // frames omitted - not stored in database
+                    transcript
                 })
             })
 
@@ -378,10 +365,7 @@ export default function RecordVideoPage() {
                             </CardContent>
                         </Card>
 
-                        <RecipeMetadataForm
-                            metadata={metadata}
-                            onChange={setMetadata}
-                        />
+
 
                         {/* Conditional: Upload or Record */}
                         {inputMode === 'upload' ? (
@@ -433,10 +417,9 @@ export default function RecordVideoPage() {
                         videoUrl={storageUrl || videoUrl || ''}
                         frames={extractedFrames}
                         keyMoments={keyMoments}
-                        metadata={metadata}
                         onFramesUpdate={setExtractedFrames}
                         onRecipeUpdate={setRecipe}
-                        onMetadataUpdate={setMetadata}
+
                         onPublish={handlePublish}
                         onStartOver={handleStartOver}
                     />

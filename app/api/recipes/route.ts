@@ -37,13 +37,7 @@ export async function POST(request: NextRequest) {
       steps,
       timing,
       techniques,
-      transcript,
-      // New video-related fields
-      video_url,
-      language,
-      cuisine_type,
-      difficulty,
-      frames
+      transcript
     } = body
 
     // Validate required fields
@@ -62,12 +56,7 @@ export async function POST(request: NextRequest) {
         steps,
         timing,
         techniques,
-        transcript,
-        video_url,
-        language,
-        cuisine_type,
-        difficulty,
-        frames
+        transcript
       })
       .select()
       .single()
