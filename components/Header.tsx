@@ -45,9 +45,9 @@ export function Header() {
                     {user ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="relative h-11 w-11 rounded-full overflow-hidden hover:ring-2 ring-primary/20 transition-all">
-                                    <Avatar className="h-full w-full border border-border">
-                                        <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                                <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 overflow-hidden hover:ring-2 ring-primary/20 transition-all flex-shrink-0">
+                                    <Avatar className="h-10 w-10 border border-border">
+                                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
                                             {user.email?.substring(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>

@@ -84,7 +84,7 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
       onTimerRequestRef.current(minutes, `Step ${currentStepRef.current + 1}`)
       return `Timer set for ${minutes} minutes`
     },
-    changeStep: (args: any) => {
+    jumpToStep: (args: any) => {
       let rawStep: any = undefined
       if (typeof args === 'number' || typeof args === 'string') {
         rawStep = args
@@ -128,7 +128,7 @@ ${stepsList}
 
 ## Tools:
 - repeatStep(): Read current step again
-- changeStep({ step: number }): Move to a specific step number.`
+- jumpToStep({ step: number }): Move to a specific step number.`
   }, [recipe.title, recipe.ingredients, recipe.steps])
 
   const conversation = useConversation({
