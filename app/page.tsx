@@ -31,7 +31,7 @@ export default function HomePage() {
 
   const fetchRecipes = async () => {
     try {
-      const response = await fetch('/api/recipes')
+      const response = await fetch('/api/recipes?limit=3')
       if (!response.ok) throw new Error('Failed to fetch recipes')
       const data = await response.json()
       setRecipes(data.recipes || [])
@@ -71,7 +71,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-            <Card className="hover:shadow-lg transition-shadow">
+            <Card className="hover:shadow-lg transition-shadow flex flex-col h-full">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Mic className="h-5 w-5 text-primary" />
@@ -81,7 +81,7 @@ export default function HomePage() {
                   Quick audio recording - narrate and let AI structure it
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="mt-auto">
                 <Link href="/record">
                   <Button className="w-full" size="lg">
                     Start Audio
@@ -90,7 +90,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow border-primary/50">
+            <Card className="hover:shadow-lg transition-shadow border-primary/50 flex flex-col h-full">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-primary" />
@@ -101,7 +101,7 @@ export default function HomePage() {
                   Full video with AI photo extraction at key moments
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="mt-auto">
                 <Link href="/record-video">
                   <Button className="w-full" size="lg" variant="default">
                     Start Video
@@ -110,26 +110,28 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow">
+            <Card className="hover:shadow-lg transition-shadow flex flex-col h-full">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-primary" />
-                  Voice Assistant
+                  Recipe Library
                 </CardTitle>
                 <CardDescription>
-                  Cook with hands-free voice guidance and real-time help
+                  Browse all recipes and cook with voice guidance
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Button className="w-full" size="lg" variant="outline" disabled={recipes.length === 0}>
-                  {recipes.length === 0 ? 'No recipes yet' : 'Browse Recipes'}
-                </Button>
+              <CardContent className="mt-auto">
+                <Link href="/recipes">
+                  <Button className="w-full" size="lg" variant="outline" disabled={recipes.length === 0}>
+                    {recipes.length === 0 ? 'No recipes yet' : 'View All Recipes'}
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
 
-          <div>
-            <h2 className="text-3xl font-bold mb-6">Recipe Library</h2>
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-6">Recent Recipes</h2>
 
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -156,10 +158,10 @@ export default function HomePage() {
                   <Link key={recipe.id} href={`/cook/${recipe.id}`}>
                     <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
                       <CardHeader>
-                        <CardTitle className="line-clamp-2">{recipe.title}</CardTitle>
-                        <div className="flex gap-2 pt-2">
+                        <div className="flex items-start justify-between gap-4">
+                          <CardTitle className="line-clamp-2 flex-1">{recipe.title}</CardTitle>
                           {recipe.timing && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="secondary" className="text-xs shrink-0 whitespace-nowrap">
                               <Clock className="mr-1 h-3 w-3" />
                               {recipe.timing.total || (recipe.timing.prep || 0) + (recipe.timing.cook || 0)} min
                             </Badge>

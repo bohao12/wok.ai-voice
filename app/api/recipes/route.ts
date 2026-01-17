@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
 // GET /api/recipes - Fetch all recipes
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const { data: recipes, error } = await supabase
+    const searchParams = request.nextUrl.searchParams
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : null
+
+    let query = supabase
       .from('recipes')
       .select('*')
       .order('created_at', { ascending: false })
+
+    if (limit) {
+      query = query.limit(limit)
+    }
+
+    const { data: recipes, error } = await query
 
     if (error) {
       console.error('Supabase error:', error)
