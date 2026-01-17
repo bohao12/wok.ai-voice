@@ -84,13 +84,6 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
   const handleStepChange = useCallback((newStep: number) => {
     if (recipe && newStep >= 0 && newStep < recipe.steps.length) {
       setCurrentStep(newStep)
-      // Speak the new step using Web Speech API
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(
-          `Step ${newStep + 1}: ${recipe.steps[newStep]}`
-        )
-        speechSynthesis.speak(utterance)
-      }
     }
   }, [recipe])
 
@@ -172,7 +165,7 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
               </CardHeader>
               <CardContent>
                 <p className="text-xl leading-relaxed">{recipe.steps[currentStep]}</p>
-                
+
                 <div className="flex gap-3 mt-6">
                   <Button
                     onClick={() => handleStepChange(currentStep - 1)}
@@ -205,19 +198,17 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
                     <div
                       key={idx}
                       onClick={() => handleStepChange(idx)}
-                      className={`flex gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                        idx === currentStep
+                      className={`flex gap-3 p-3 rounded-lg cursor-pointer transition-colors ${idx === currentStep
                           ? 'bg-primary/10 border-2 border-primary'
                           : 'bg-muted hover:bg-muted/70'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2">
                         <span
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-semibold ${
-                            completedSteps.has(idx)
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-semibold ${completedSteps.has(idx)
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-background text-foreground'
-                          }`}
+                            }`}
                         >
                           {completedSteps.has(idx) ? <Check className="h-4 w-4" /> : idx + 1}
                         </span>

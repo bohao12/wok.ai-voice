@@ -14,8 +14,11 @@ import {
     Edit2,
     Image as ImageIcon,
     FileText,
-    Save
+    Save,
+    Plus,
+    Trash2
 } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
 
 interface KeyMoment {
     timestamp: number
@@ -54,6 +57,7 @@ interface VideoReviewProps {
     keyMoments: KeyMoment[]
     onFramesUpdate: (frames: ExtractedFrame[]) => void
     onRecipeUpdate: (recipe: RecipeData) => void
+    onTranscriptUpdate: (transcript: string) => void
     onPublish: () => void
     onStartOver: () => void
 }
@@ -66,6 +70,7 @@ export function VideoReview({
     keyMoments,
     onFramesUpdate,
     onRecipeUpdate,
+    onTranscriptUpdate,
     onPublish,
     onStartOver
 }: VideoReviewProps) {
@@ -257,15 +262,47 @@ export function VideoReview({
 
             {/* Ingredients */}
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Ingredients</CardTitle>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            const newIngredients = [...recipe.ingredients, '']
+                            onRecipeUpdate({ ...recipe, ingredients: newIngredients })
+                        }}
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Ingredient
+                    </Button>
                 </CardHeader>
                 <CardContent>
-                    <ul className="space-y-2">
+                    <ul className="space-y-3">
                         {recipe.ingredients.map((ingredient, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                                <Check className="h-4 w-4 mt-1 text-primary" />
-                                <span>{ingredient}</span>
+                            <li key={idx} className="flex items-center gap-2">
+                                <div className="h-4 w-4 shrink-0 mt-1">
+                                    <Check className="h-4 w-4 text-primary" />
+                                </div>
+                                <Input
+                                    value={ingredient}
+                                    onChange={(e) => {
+                                        const newIngredients = [...recipe.ingredients]
+                                        newIngredients[idx] = e.target.value
+                                        onRecipeUpdate({ ...recipe, ingredients: newIngredients })
+                                    }}
+                                    placeholder="Ingredient amount and name"
+                                    className="flex-1"
+                                />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                        const newIngredients = recipe.ingredients.filter((_, i) => i !== idx)
+                                        onRecipeUpdate({ ...recipe, ingredients: newIngredients })
+                                    }}
+                                >
+                                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                </Button>
                             </li>
                         ))}
                     </ul>
@@ -274,41 +311,80 @@ export function VideoReview({
 
             {/* Steps */}
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Instructions</CardTitle>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            const newSteps = [...recipe.steps, '']
+                            onRecipeUpdate({ ...recipe, steps: newSteps })
+                        }}
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Step
+                    </Button>
                 </CardHeader>
                 <CardContent>
-                    <ol className="space-y-4">
+                    <div className="space-y-4">
                         {recipe.steps.map((step, idx) => (
-                            <li key={idx} className="flex gap-3">
-                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold">
+                            <div key={idx} className="flex gap-3">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold mt-1">
                                     {idx + 1}
                                 </span>
-                                <p className="pt-1">{step}</p>
-                            </li>
+                                <Textarea
+                                    value={step}
+                                    onChange={(e) => {
+                                        const newSteps = [...recipe.steps]
+                                        newSteps[idx] = e.target.value
+                                        onRecipeUpdate({ ...recipe, steps: newSteps })
+                                    }}
+                                    placeholder={`Step ${idx + 1} instructions...`}
+                                    className="flex-1 min-h-[80px]"
+                                />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="mt-1"
+                                    onClick={() => {
+                                        const newSteps = recipe.steps.filter((_, i) => i !== idx)
+                                        onRecipeUpdate({ ...recipe, steps: newSteps })
+                                    }}
+                                >
+                                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                </Button>
+                            </div>
                         ))}
-                    </ol>
+                    </div>
                 </CardContent>
             </Card>
 
             {/* Transcript */}
             <Card>
                 <CardHeader>
-                    <CardTitle
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => setShowTranscript(!showTranscript)}
-                    >
-                        <FileText className="h-5 w-5" />
-                        Original Transcript
-                        <Badge variant="outline" className="ml-2">
-                            {showTranscript ? 'Hide' : 'Show'}
-                        </Badge>
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle
+                            className="flex items-center gap-2 cursor-pointer"
+                            onClick={() => setShowTranscript(!showTranscript)}
+                        >
+                            <FileText className="h-5 w-5" />
+                            Original Transcript
+                            <Badge variant="outline" className="ml-2">
+                                {showTranscript ? 'Hide' : 'Show'}
+                            </Badge>
+                        </CardTitle>
+                    </div>
                 </CardHeader>
                 {showTranscript && (
                     <CardContent>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                            {transcript}
+                        <Textarea
+                            value={transcript}
+                            onChange={(e) => onTranscriptUpdate(e.target.value)}
+                            className="min-h-[200px] font-mono text-sm leading-relaxed"
+                            placeholder=" Transcript will appear here..."
+                        />
+                        <p className="text-xs text-muted-foreground mt-2">
+                            You can edit any errors in the AI transcription here.
                         </p>
                     </CardContent>
                 )}
