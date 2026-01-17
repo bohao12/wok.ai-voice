@@ -79,8 +79,8 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
       onTimerRequest(minutes, `Step ${currentStepRef.current + 1}`)
       return `Timer set for ${minutes} minutes`
     },
-    jumpToStep: ({ step }: { step: number }) => {
-      console.log('Tool called: jumpToStep with step:', step)
+    changeStep: ({ step }: { step: number }) => {
+      console.log('Tool called: changeStep with step:', step)
       lastChangeSource.current = 'agent'
 
       const targetIndex = step - 1
@@ -89,7 +89,8 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
         return `Moved to step ${step}`
       }
       return `Step ${step} does not exist. Please specify a step between 1 and ${recipe.steps.length}`
-    }
+    },
+
   }), [recipe, currentStep, onStepChange, onTimerRequest])
 
   const recipeContext = useMemo(() => {
@@ -126,8 +127,8 @@ ${techniquesList}
 
 ## Your Role:
 - You help the user cook "${recipe.title}".
-- You have FULL control to navigate to ANY step using the tool "jumpToStep".
-- If the user says "Go to step 5", "Jump to step 3", or "I'm on step 2", IMMEDIATELY call the "jumpToStep" tool.
+- You have FULL control to navigate to ANY step using the tool "changeStep". This tool updates the user's screen.
+- If the user says "Go to step 5", "Jump to step 3", or "I'm on step 2", IMMEDIATELY call the "changeStep" tool.
 - Answer questions about ingredients, techniques, and steps.
 - Use "nextStep" and "previousStep" for sequential navigation.
 
@@ -135,8 +136,10 @@ ${techniquesList}
 - nextStep(): Move to next step
 - previousStep(): Move to previous step
 - repeatStep(): Read current step again
-- jumpToStep({ step: number }): DIRECTLY jump to a specific step number. Example: call jumpToStep with argument { "step": 3 } to go to step 3.
+- changeStep({ step: number }): DIRECTLY jump to a specific step number. Example: call changeStep with argument { "step": 3 } to go to step 3.
 - setTimer({ minutes: number }): Start a timer
+
+IMPORTANT: To change the step on the UI, you MUST call one of the navigation tools (changeStep, nextStep, previousStep). Merely saying you are changing the step is NOT sufficient. The visible step only updates when a tool is called.
 
 When you move to a new step (via any tool), the tool will return the text of that step. READ that text to the user naturally.`
   }, [recipe])
