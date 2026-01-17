@@ -23,11 +23,12 @@ interface Recipe {
 interface VoiceAssistantProps {
   recipe: Recipe
   currentStep: number
+  completedSteps: Set<number>
   onStepChange: (step: number) => void
   onTimerRequest: (minutes: number, label: string) => void
 }
 
-export function VoiceAssistant({ recipe, currentStep, onStepChange, onTimerRequest }: VoiceAssistantProps) {
+export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChange, onTimerRequest }: VoiceAssistantProps) {
   const [error, setError] = useState<string | null>(null)
   const [transcript, setTranscript] = useState<string>('')
   const [agentResponse, setAgentResponse] = useState<string>('')
@@ -77,6 +78,17 @@ export function VoiceAssistant({ recipe, currentStep, onStepChange, onTimerReque
       console.log('Tool called: setTimer with minutes:', minutes)
       onTimerRequest(minutes, `Step ${currentStepRef.current + 1}`)
       return `Timer set for ${minutes} minutes`
+    },
+    jumpToStep: ({ step }: { step: number }) => {
+      console.log('Tool called: jumpToStep with step:', step)
+      lastChangeSource.current = 'agent'
+
+      const targetIndex = step - 1
+      if (targetIndex >= 0 && targetIndex < recipe.steps.length) {
+        onStepChange(targetIndex)
+        return `Moved to step ${step}`
+      }
+      return `Step ${step} does not exist. Please specify a step between 1 and ${recipe.steps.length}`
     }
   }), [recipe, currentStep, onStepChange, onTimerRequest])
 
@@ -101,8 +113,8 @@ export function VoiceAssistant({ recipe, currentStep, onStepChange, onTimerReque
       ? `Techniques used: ${recipe.techniques.join(', ')}`
       : ''
 
-    return `You are helping the user cook "${recipe.title}".
-
+    return `You are helping the user cook "${recipe.title}". 
+    
 **All Ingredients:**
 ${ingredientsList}
 
@@ -113,13 +125,20 @@ ${timingInfo}
 ${techniquesList}
 
 ## Your Role:
+- You help the user cook "${recipe.title}".
+- You have FULL control to navigate to ANY step using the tool "jumpToStep".
+- If the user says "Go to step 5", "Jump to step 3", or "I'm on step 2", IMMEDIATELY call the "jumpToStep" tool.
 - Answer questions about ingredients, techniques, and steps.
-- Use the client tools (nextStep, previousStep, repeatStep, setTimer) when the user requests navigation or timers.
-- Be encouraging and helpful.
-- Keep responses concise since the user is actively cooking.
+- Use "nextStep" and "previousStep" for sequential navigation.
 
-When the user says "next", "back", "repeat", call the appropriate tool.
-The tool will return the text of the new step. READ that text to the user.`
+## Tools:
+- nextStep(): Move to next step
+- previousStep(): Move to previous step
+- repeatStep(): Read current step again
+- jumpToStep({ step: number }): DIRECTLY jump to a specific step number. Example: call jumpToStep with argument { "step": 3 } to go to step 3.
+- setTimer({ minutes: number }): Start a timer
+
+When you move to a new step (via any tool), the tool will return the text of that step. READ that text to the user naturally.`
   }, [recipe])
 
   // Initialize the conversation with the ElevenLabs React SDK
@@ -259,7 +278,11 @@ The tool will return the text of the new step. READ that text to the user.`
           // 1. Interrupt current speech (implicit in sending a new user message)
           // 2. Force the agent to acknowledge the new step and read it
           // 3. EXPLICITLY tell it not to call tools, to prevent a feedback loop
-          conversation.sendUserMessage(`SYSTEM UPDATE: The user has manually moved to step ${currentStep + 1}. Do NOT call any navigation tools. Just stop speaking and read the instruction for step ${currentStep + 1}.`)
+
+          const isCompleted = completedSteps.has(currentStep)
+          const completionNote = isCompleted ? " NOTE: The user has already marked this step as completed." : ""
+
+          conversation.sendUserMessage(`SYSTEM UPDATE: The user has manually moved to step ${currentStep + 1}.${completionNote} Do NOT call any navigation tools. Just stop speaking and read the instruction for step ${currentStep + 1}.`)
         }
 
         // Reset the source to 'user' for the next potential interaction
@@ -269,7 +292,7 @@ The tool will return the text of the new step. READ that text to the user.`
       // Keep ref in sync even if not active
       prevStepRef.current = currentStep
     }
-  }, [currentStep, isActive, conversation])
+  }, [currentStep, isActive, conversation, completedSteps])
 
   return (
     <div data-assistant-active={isActive}>

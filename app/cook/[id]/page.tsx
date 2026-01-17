@@ -66,6 +66,14 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
     }
   }, [timerManager])
 
+  // scroll to top when step changes
+  useEffect(() => {
+    const element = document.getElementById('current-step-card')
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [currentStep])
+
   const fetchRecipe = async () => {
     try {
       const response = await fetch(`/api/recipes/${resolvedParams.id}`)
@@ -160,7 +168,7 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {/* Current Step */}
-            <Card className="border-2 border-primary">
+            <Card id="current-step-card" className="border-2 border-primary scroll-mt-24">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Step {currentStep + 1} of {recipe.steps.length}</span>
@@ -243,6 +251,7 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
             <VoiceAssistant
               recipe={recipe}
               currentStep={currentStep}
+              completedSteps={completedSteps}
               onStepChange={handleStepChange}
               onTimerRequest={handleTimerRequest}
             />
