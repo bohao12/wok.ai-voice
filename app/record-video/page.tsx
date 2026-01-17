@@ -419,6 +419,7 @@ export default function RecordVideoPage() {
                         keyMoments={keyMoments}
                         onFramesUpdate={setExtractedFrames}
                         onRecipeUpdate={setRecipe}
+                        onTranscriptUpdate={setTranscript}
 
                         onPublish={handlePublish}
                         onStartOver={handleStartOver}

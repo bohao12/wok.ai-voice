@@ -75,13 +75,16 @@ export function VoiceAssistant({ recipe, currentStep, onStepChange, onTimerReque
     },
     setTimer: ({ minutes }: { minutes: number }) => {
       console.log('Tool called: setTimer with minutes:', minutes)
-      onTimerRequest(minutes, `Step ${currentStep + 1}`)
+      onTimerRequest(minutes, `Step ${currentStepRef.current + 1}`)
       return `Timer set for ${minutes} minutes`
     }
   }), [recipe, currentStep, onStepChange, onTimerRequest])
 
-  // Format recipe context for the agent
   const recipeContext = useMemo(() => {
+    // We provide the FULL recipe context initially.
+    // We DO NOT include the dynamic "currentStep" here to avoid re-creating the prompt and restarting the session.
+    // The agent will track the step via the conversation history and tool outputs.
+
     const ingredientsList = recipe.ingredients
       .map((ing, i) => `${i + 1}. ${ing}`)
       .join('\n')
@@ -98,9 +101,7 @@ export function VoiceAssistant({ recipe, currentStep, onStepChange, onTimerReque
       ? `Techniques used: ${recipe.techniques.join(', ')}`
       : ''
 
-    return `You are helping the user cook "${recipe.title}". They are currently on step ${currentStep + 1} of ${recipe.steps.length}.
-
-**Current Step:** ${recipe.steps[currentStep]}
+    return `You are helping the user cook "${recipe.title}".
 
 **All Ingredients:**
 ${ingredientsList}
@@ -112,19 +113,14 @@ ${timingInfo}
 ${techniquesList}
 
 ## Your Role:
-- Answer questions about ingredients, techniques, and steps
-- Use the client tools (nextStep, previousStep, repeatStep, setTimer) when the user requests navigation or timers
-- Be encouraging and helpful
-- Keep responses concise since the user is actively cooking
+- Answer questions about ingredients, techniques, and steps.
+- Use the client tools (nextStep, previousStep, repeatStep, setTimer) when the user requests navigation or timers.
+- Be encouraging and helpful.
+- Keep responses concise since the user is actively cooking.
 
-When the user says:
-- "next step" or "next" → Call the nextStep tool
-- "previous step" or "back" → Call the previousStep tool  
-- "repeat" or "say that again" → Call the repeatStep tool
-- "set timer for X minutes" → Call the setTimer tool with the minutes parameter
-
-For other questions, provide helpful cooking advice based on the recipe information above.`
-  }, [recipe, currentStep])
+When the user says "next", "back", "repeat", call the appropriate tool.
+The tool will return the text of the new step. READ that text to the user.`
+  }, [recipe])
 
   // Initialize the conversation with the ElevenLabs React SDK
   const conversation = useConversation({
@@ -151,6 +147,7 @@ For other questions, provide helpful cooking advice based on the recipe informat
     onMessage: (message: any) => {
       console.log('Message received:', message)
 
+
       // Handle user transcripts
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((message as any).type === 'user_transcript' || (message as any).type === 'user_transcription') {
@@ -159,6 +156,7 @@ For other questions, provide helpful cooking advice based on the recipe informat
           setTranscript(text)
         }
       }
+
 
       // Handle agent responses
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,6 +168,7 @@ For other questions, provide helpful cooking advice based on the recipe informat
       }
     }
   })
+
 
   // Cleanup on unmount
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,6 +187,7 @@ For other questions, provide helpful cooking advice based on the recipe informat
     try {
       setError(null)
 
+
       // Request microphone permissions first
       const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true })
       // Stop the tracks immediately as we only needed to request permission
@@ -199,7 +199,9 @@ For other questions, provide helpful cooking advice based on the recipe informat
         throw new Error('Failed to get signed URL')
       }
 
+
       const { signedUrl } = await response.json()
+
 
       if (!signedUrl) {
         throw new Error('No signed URL returned')

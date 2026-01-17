@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
         const promptText = `You are an expert chef analyzing a cooking video. Watch this video and:
-
-1. Transcribe what is being said (if there's narration)
+1. Transcribe what is being said (narration or instructions).
+   - IMPORTANT: IGNORE background music, lyrics, or random noise. Only transcribe speech related to the cooking or recipe instructions.
 2. Describe what's happening visually
 3. Extract a complete recipe with ingredients, steps, timing, and techniques
 
@@ -60,7 +60,7 @@ Language: ${language === 'en' ? 'English' : language === 'zh' ? 'Chinese' : lang
 
 Return your analysis as a JSON object (no markdown code blocks):
 {
-  "transcript": "Full transcription of what was said in the video",
+  "transcript": "Full transcription of the spoken instructions/narration",
   "visualDescription": "Description of what you see happening in the video",
   "recipe": {
     "title": "Name of the dish",
