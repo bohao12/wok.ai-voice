@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useConversation } from '@elevenlabs/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -31,30 +31,47 @@ export function VoiceAssistant({ recipe, currentStep, onStepChange, onTimerReque
   const [error, setError] = useState<string | null>(null)
   const [transcript, setTranscript] = useState<string>('')
   const [agentResponse, setAgentResponse] = useState<string>('')
-  
+
+  // Ref to track source of step change to prevent double-speaking or loops
+  const lastChangeSource = useRef<'user' | 'agent'>('user')
+
+  // Ref to track current step for tools to avoid stale closures
+  const currentStepRef = useRef(currentStep)
+
+  // Keep step ref in sync
+  useEffect(() => {
+    console.log(`[VoiceAssistant] Step changed: ${currentStepRef.current} -> ${currentStep}`)
+    currentStepRef.current = currentStep
+  }, [currentStep])
+
   // Define client tools that the agent can call
   const clientTools = useMemo(() => ({
     nextStep: () => {
       console.log('Tool called: nextStep')
-      if (currentStep < recipe.steps.length - 1) {
-        onStepChange(currentStep + 1)
+      lastChangeSource.current = 'agent'
+      const step = currentStepRef.current
+      if (step < recipe.steps.length - 1) {
+        onStepChange(step + 1)
         return 'Moved to next step'
       }
       return 'Already at the last step'
     },
     previousStep: () => {
       console.log('Tool called: previousStep')
-      if (currentStep > 0) {
-        onStepChange(currentStep - 1)
+      lastChangeSource.current = 'agent'
+      const step = currentStepRef.current
+      if (step > 0) {
+        onStepChange(step - 1)
         return 'Moved to previous step'
       }
       return 'Already at the first step'
     },
     repeatStep: () => {
       console.log('Tool called: repeatStep')
+      const step = currentStepRef.current
       // Trigger re-announcement of current step
-      onStepChange(currentStep)
-      return `Repeating step ${currentStep + 1}`
+      onStepChange(step)
+      return `Repeating step ${step + 1}`
     },
     setTimer: ({ minutes }: { minutes: number }) => {
       console.log('Tool called: setTimer with minutes:', minutes)
@@ -73,7 +90,7 @@ export function VoiceAssistant({ recipe, currentStep, onStepChange, onTimerReque
       .map((step, i) => `Step ${i + 1}: ${step}`)
       .join('\n')
 
-    const timingInfo = recipe.timing 
+    const timingInfo = recipe.timing
       ? `Timing: Prep ${recipe.timing.prep || 0} min, Cook ${recipe.timing.cook || 0} min, Total ${recipe.timing.total || 0} min`
       : ''
 
@@ -133,7 +150,7 @@ For other questions, provide helpful cooking advice based on the recipe informat
     },
     onMessage: (message: any) => {
       console.log('Message received:', message)
-      
+
       // Handle user transcripts
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((message as any).type === 'user_transcript' || (message as any).type === 'user_transcription') {
@@ -142,7 +159,7 @@ For other questions, provide helpful cooking advice based on the recipe informat
           setTranscript(text)
         }
       }
-      
+
       // Handle agent responses
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((message as any).type === 'agent_response') {
@@ -153,7 +170,7 @@ For other questions, provide helpful cooking advice based on the recipe informat
       }
     }
   })
-  
+
   // Cleanup on unmount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -170,7 +187,7 @@ For other questions, provide helpful cooking advice based on the recipe informat
   const startConversation = async () => {
     try {
       setError(null)
-      
+
       // Request microphone permissions first
       const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true })
       // Stop the tracks immediately as we only needed to request permission
@@ -181,9 +198,9 @@ For other questions, provide helpful cooking advice based on the recipe informat
       if (!response.ok) {
         throw new Error('Failed to get signed URL')
       }
-      
+
       const { signedUrl } = await response.json()
-      
+
       if (!signedUrl) {
         throw new Error('No signed URL returned')
       }
@@ -220,83 +237,117 @@ For other questions, provide helpful cooking advice based on the recipe informat
   const isConnecting = conversation.status === 'connecting'
   const isSpeaking = conversation.isSpeaking
 
+  // Ref to track previous step to prevent spurious interruptions
+  const prevStepRef = useRef(currentStep)
+
+  // Detect when currentStep changes from the outside (UI buttons)
+  // and handle interruption of the voice assistant
+  useEffect(() => {
+    if (isActive) {
+      // Check if step actually changed
+      const stepChanged = prevStepRef.current !== currentStep
+
+      if (stepChanged) {
+        // Update ref
+        prevStepRef.current = currentStep
+
+        // If the change wasn't triggered by the agent (via tools), it's a manual user action
+        if (lastChangeSource.current === 'user') {
+          // Send a message to the agent to:
+          // 1. Interrupt current speech (implicit in sending a new user message)
+          // 2. Force the agent to acknowledge the new step and read it
+          // 3. EXPLICITLY tell it not to call tools, to prevent a feedback loop
+          conversation.sendUserMessage(`SYSTEM UPDATE: The user has manually moved to step ${currentStep + 1}. Do NOT call any navigation tools. Just stop speaking and read the instruction for step ${currentStep + 1}.`)
+        }
+
+        // Reset the source to 'user' for the next potential interaction
+        lastChangeSource.current = 'user'
+      }
+    } else {
+      // Keep ref in sync even if not active
+      prevStepRef.current = currentStep
+    }
+  }, [currentStep, isActive, conversation])
+
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">AI Voice Assistant</h3>
-          {isActive && (
-            <Badge variant="default" className={isSpeaking ? 'animate-pulse' : ''}>
-              {isSpeaking ? 'Speaking' : 'Listening'}
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <Button
-            onClick={toggleConversation}
-            disabled={isConnecting}
-            size="lg"
-            className="w-full"
-            variant={isActive ? "destructive" : "default"}
-          >
-            {isConnecting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connecting...
-              </>
-            ) : isActive ? (
-              <>
-                <VolumeX className="mr-2 h-4 w-4" />
-                Stop Voice Assistant
-              </>
-            ) : (
-              <>
-                <Volume2 className="mr-2 h-4 w-4" />
-                Start Voice Assistant
-              </>
+    <div data-assistant-active={isActive}>
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">AI Voice Assistant</h3>
+            {isActive && (
+              <Badge variant="default" className={isSpeaking ? 'animate-pulse' : ''}>
+                {isSpeaking ? 'Speaking' : 'Listening'}
+              </Badge>
             )}
-          </Button>
-
-          {error && (
-            <div className="p-3 bg-destructive/10 rounded-md border border-destructive/20">
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
-
-          {transcript && (
-            <div className="p-3 bg-muted rounded-md">
-              <p className="text-sm text-muted-foreground mb-1">You said:</p>
-              <p className="text-sm">{transcript}</p>
-            </div>
-          )}
-
-          {agentResponse && (
-            <div className="p-3 bg-primary/10 rounded-md border border-primary/20">
-              <p className="text-sm text-muted-foreground mb-1">Assistant:</p>
-              <p className="text-sm">{agentResponse}</p>
-            </div>
-          )}
-
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p className="font-semibold">Try saying:</p>
-            <ul className="list-disc list-inside space-y-0.5">
-              <li>&quot;Next step&quot; - Move forward</li>
-              <li>&quot;Previous step&quot; - Go back</li>
-              <li>&quot;Repeat that&quot; - Hear current step again</li>
-              <li>&quot;Set timer for X minutes&quot; - Start timer</li>
-              <li>&quot;What is [ingredient]?&quot; - Get info</li>
-              <li>&quot;How do I [technique]?&quot; - Get help</li>
-            </ul>
           </div>
 
-          {conversation.status === 'disconnected' && (
-            <div className="text-xs text-muted-foreground">
-              <p>💡 <strong>Tip:</strong> Make sure your microphone is enabled and you&apos;re in a quiet environment for best results.</p>
+          <div className="flex flex-col gap-4">
+            <Button
+              onClick={toggleConversation}
+              disabled={isConnecting}
+              size="lg"
+              className="w-full"
+              variant={isActive ? "destructive" : "default"}
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : isActive ? (
+                <>
+                  <VolumeX className="mr-2 h-4 w-4" />
+                  Stop Voice Assistant
+                </>
+              ) : (
+                <>
+                  <Volume2 className="mr-2 h-4 w-4" />
+                  Start Voice Assistant
+                </>
+              )}
+            </Button>
+
+            {error && (
+              <div className="p-3 bg-destructive/10 rounded-md border border-destructive/20">
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
+
+            {transcript && (
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-sm text-muted-foreground mb-1">You said:</p>
+                <p className="text-sm">{transcript}</p>
+              </div>
+            )}
+
+            {agentResponse && (
+              <div className="p-3 bg-primary/10 rounded-md border border-primary/20">
+                <p className="text-sm text-muted-foreground mb-1">Assistant:</p>
+                <p className="text-sm">{agentResponse}</p>
+              </div>
+            )}
+
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold">Try saying:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>&quot;Next step&quot; - Move forward</li>
+                <li>&quot;Previous step&quot; - Go back</li>
+                <li>&quot;Repeat that&quot; - Hear current step again</li>
+                <li>&quot;Set timer for X minutes&quot; - Start timer</li>
+                <li>&quot;What is [ingredient]?&quot; - Get info</li>
+                <li>&quot;How do I [technique]?&quot; - Get help</li>
+              </ul>
             </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+
+            {conversation.status === 'disconnected' && (
+              <div className="text-xs text-muted-foreground">
+                <p>💡 <strong>Tip:</strong> Make sure your microphone is enabled and you&apos;re in a quiet environment for best results.</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
