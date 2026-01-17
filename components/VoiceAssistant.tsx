@@ -92,18 +92,32 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
       onTimerRequestRef.current(minutes, `Step ${currentStepRef.current + 1}`)
       return `Timer set for ${minutes} minutes`
     },
-    changeStep: ({ step }: { step: number }) => {
-      console.log('Tool called: changeStep with step:', step)
+    changeStep: (args: any) => {
+      console.log('Tool called: changeStep with args:', args)
 
-      const targetIndex = step - 1
+      let rawStep: any = undefined
+      if (typeof args === 'number' || typeof args === 'string') {
+        rawStep = args
+      } else if (args && typeof args === 'object') {
+        rawStep = args.step || args.stepNumber || args.stepIndex || args.number
+      }
+
+      const stepNum = parseInt(String(rawStep))
+      console.log('Resolved step number:', stepNum)
+
+      if (isNaN(stepNum)) {
+        return `Error: Could not determine step number from input. Please use { "step": number }.`
+      }
+
       const r = recipeRef.current
+      const targetIndex = stepNum - 1
+
       if (targetIndex >= 0 && targetIndex < r.steps.length) {
         console.log(`Executing jump to index ${targetIndex}`)
         onStepChangeRef.current(targetIndex)
-        // Return the actual text of the step so the AI knows what to read
-        return `Moved to step ${step}. The instruction is: ${r.steps[targetIndex]}`
+        return `Moved to step ${stepNum}. The instruction is: ${r.steps[targetIndex]}`
       }
-      return `Step ${step} does not exist. Please specify a step between 1 and ${recipe.steps.length}`
+      return `Step ${stepNum} does not exist. Please specify a step between 1 and ${r.steps.length}`
     },
 
   }), [recipe, currentStep, onStepChange, onTimerRequest])
@@ -143,18 +157,14 @@ ${techniquesList}
 ## Your Role:
 - You help the user cook "${recipe.title}".
 - You have FULL control to navigate to ANY step using the tool "changeStep". This tool updates the user's screen.
-- If the user says "Go to step 5", "Jump to step 3", or "I'm on step 2", IMMEDIATELY call the "changeStep" tool.
 - Answer questions about ingredients, techniques, and steps.
-- Use "nextStep" and "previousStep" for sequential navigation.
 
 ## Tools:
-- nextStep(): Move to next step
-- previousStep(): Move to previous step
 - repeatStep(): Read current step again
-- changeStep({ step: number }): DIRECTLY jump to a specific step number. Example: call changeStep with argument { "step": 3 } to go to step 3.
-- setTimer({ minutes: number }): Start a timer
+- changeStep({ step: number }): Move to a specific step number. Example: call changeStep with argument { "step": 3 } to go to step 3.
 
-IMPORTANT: To change the step on the UI, you MUST call one of the navigation tools (changeStep, nextStep, previousStep). Merely saying you are changing the step is NOT sufficient. The visible step only updates when a tool is called.
+IMPORTANT: Always check if the step number has changed. If it has, you MUST call changeStep with the new step number such that the user's UI is synced.
+- For example, { "step": 3 } when the new step number is step 3.
 
 When you move to a new step (via any tool), the tool will return the text of that step. READ that text to the user naturally.`
   }, [recipe])
