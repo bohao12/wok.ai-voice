@@ -3,9 +3,12 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/context/AuthContext'
+import { supabase } from '@/lib/supabase'
 import { VideoRecorder } from '@/components/VideoRecorder'
 import { VideoUploader } from '@/components/VideoUploader'
 import { VideoReview } from '@/components/VideoReview'
+import { Header } from '@/components/Header'
 
 import { VideoAnalyzer } from '@/components/TranscriptEditor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -210,21 +213,24 @@ export default function RecordVideoPage() {
         })
     }
 
+    const { user } = useAuth()
+
     const handlePublish = async () => {
         if (!recipe) return
 
         try {
-            // Only save recipe data to database (no video/frame URLs - they're too large)
-            const response = await fetch('/api/recipes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            // Use Supabase client directly to ensure RLS policies work with the user's session
+            const { error } = await supabase
+                .from('recipes')
+                .insert({
                     ...recipe,
-                    transcript
+                    transcript,
+                    // If user is logged in, attach their ID. Supabase RLS will verify this matches auth.uid()
+                    // If not logged in, user_id is undefined/null
+                    user_id: user?.id || null
                 })
-            })
 
-            if (!response.ok) throw new Error('Failed to publish recipe')
+            if (error) throw error
 
             setStep('published')
             setTimeout(() => router.push('/'), 2000)
@@ -248,14 +254,7 @@ export default function RecordVideoPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            <header className="border-b">
-                <div className="container mx-auto px-4 py-4">
-                    <Link href="/" className="flex items-center gap-2 text-2xl font-bold">
-                        <ChefHat className="h-8 w-8 text-primary" />
-                        <span>Wok.AI</span>
-                    </Link>
-                </div>
-            </header>
+            <Header />
 
             <main className="container mx-auto px-4 py-8 max-w-4xl">
                 <div className="flex items-center gap-3 mb-8">

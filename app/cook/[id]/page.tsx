@@ -10,6 +10,7 @@ import { VoiceAssistant } from '@/components/VoiceAssistant'
 import { TimerDisplay } from '@/components/TimerDisplay'
 import { TimerManager, Timer } from '@/lib/timer-manager'
 import { ChefHat, ChevronLeft, ChevronRight, Clock, Check } from 'lucide-react'
+import { Header } from '@/components/Header'
 
 interface Recipe {
   id: string
@@ -140,14 +141,7 @@ export default function CookPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <Link href="/" className="flex items-center gap-2 text-2xl font-bold">
-            <ChefHat className="h-8 w-8 text-primary" />
-            <span>Wok.AI</span>
-          </Link>
-        </div>
-      </header>
+      <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">

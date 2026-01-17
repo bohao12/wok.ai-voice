@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ChefHat, Mic, BookOpen, Clock, Loader2 } from 'lucide-react'
+import { Header } from '@/components/Header'
 
 interface Recipe {
   id: string
@@ -44,22 +45,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-2xl font-bold">
-              <ChefHat className="h-8 w-8 text-primary" />
-              <span>Wok.AI</span>
-            </div>
-            <Link href="/record">
-              <Button size="lg">
-                <Mic className="mr-2 h-4 w-4" />
-                Record Recipe
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-6xl mx-auto">
