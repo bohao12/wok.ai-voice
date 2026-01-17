@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { structureRecipeFromTranscript, RecipeStructure } from '@/lib/recipe-structure'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
@@ -99,16 +100,15 @@ Be thorough in your analysis. Return ONLY the JSON object.`
         console.log(responseText)
         console.log('=== END RESPONSE ===')
 
-        // Parse the response
         let analysisResult: {
             transcript: string
             visualDescription?: string
-            recipe: { title: string; ingredients: string[]; steps: string[]; timing: Record<string, number>; techniques: string[] }
+            recipe: RecipeStructure
             keyMoments: KeyMoment[]
         } = {
             transcript: '',
             visualDescription: '',
-            recipe: { title: '', ingredients: [], steps: [], timing: {}, techniques: [] },
+            recipe: { title: '', ingredients: [], steps: [], timing: { prep: 0, cook: 0, total: 0 }, techniques: [] },
             keyMoments: []
         }
 
@@ -120,7 +120,27 @@ Be thorough in your analysis. Return ONLY the JSON object.`
                 jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
             }
             analysisResult = JSON.parse(jsonText)
-            console.log('Parsed recipe title:', analysisResult.recipe?.title)
+            console.log('Parsed initial video analysis. Transcript length:', analysisResult.transcript?.length)
+
+            // --- NEW: Re-structure using the dedicated voice flow logic ---
+            if (analysisResult.transcript) {
+                try {
+                    console.log('Structuring recipe from transcript...')
+                    const structuredRecipe = await structureRecipeFromTranscript(analysisResult.transcript)
+                    console.log('Successfully structured recipe:', structuredRecipe.title)
+
+                    // Only override if the structured recipe actually has content
+                    if (structuredRecipe.steps && structuredRecipe.steps.length > 0) {
+                        console.log(`Overriding video recipe with structured recipe (${structuredRecipe.steps.length} steps)`)
+                        analysisResult.recipe = structuredRecipe
+                    } else {
+                        console.warn('Structured recipe has no steps, keeping original video analysis')
+                    }
+                } catch (structureError) {
+                    console.error('Failed to strict-structure recipe, falling back to video analysis result:', structureError)
+                    // Fallback is already in analysisResult.recipe, so we just log the warning
+                }
+            }
         } catch (parseError) {
             console.error('Failed to parse Gemini response:', parseError)
             // Use raw response as transcript
@@ -131,6 +151,18 @@ Be thorough in your analysis. Return ONLY the JSON object.`
                 steps: ['See transcript for details'],
                 timing: { prep: 10, cook: 20, total: 30 },
                 techniques: []
+            }
+
+            // Even if JSON parse failed, if we have text, we can try to structure it? 
+            // Often if JSON fails, the text is the transcript. Let's try one more time if it looks like text.
+            if (responseText.length > 50) {
+                try {
+                    const structuredRecipe = await structureRecipeFromTranscript(responseText)
+                    analysisResult.recipe = structuredRecipe
+                    analysisResult.transcript = responseText // Assume the whole text was the transcript
+                } catch (e) {
+                    console.log('Fallback structure failed too')
+                }
             }
         }
 

@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
       modelId: 'scribe_v1',
     })
 
-    const transcript = result.text || ''
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transcript = (result as any).text || ''
     console.log('Transcription successful, length:', transcript.length)
 
     return NextResponse.json({ transcript })
