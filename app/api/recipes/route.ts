@@ -6,11 +6,16 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : null
+    const search = searchParams.get('search')
 
     let query = supabase
       .from('recipes')
       .select('*')
       .order('created_at', { ascending: false })
+
+    if (search) {
+      query = query.ilike('title', `%${search}%`)
+    }
 
     if (limit) {
       query = query.limit(limit)

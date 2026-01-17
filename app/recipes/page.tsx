@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ChefHat, Clock, Loader2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { ChefHat, Clock, Loader2, Search } from 'lucide-react'
 
 interface Recipe {
     id: string
@@ -23,14 +24,23 @@ interface Recipe {
 export default function RecipesPage() {
     const [recipes, setRecipes] = useState<Recipe[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [searchQuery, setSearchQuery] = useState('')
 
     useEffect(() => {
-        fetchRecipes()
-    }, [])
+        const timer = setTimeout(() => {
+            fetchRecipes()
+        }, 500)
+
+        return () => clearTimeout(timer)
+    }, [searchQuery])
 
     const fetchRecipes = async () => {
         try {
-            const response = await fetch('/api/recipes')
+            setIsLoading(true)
+            const params = new URLSearchParams()
+            if (searchQuery) params.append('search', searchQuery)
+
+            const response = await fetch(`/api/recipes?${params.toString()}`)
             if (!response.ok) throw new Error('Failed to fetch recipes')
             const data = await response.json()
             setRecipes(data.recipes || [])
@@ -54,6 +64,18 @@ export default function RecipesPage() {
 
             <main className="container mx-auto px-4 py-12">
                 <div className="max-w-6xl mx-auto">
+                    <div className="mb-8">
+                        <div className="relative max-w-md">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search recipes..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-8"
+                            />
+                        </div>
+                    </div>
+
                     <div className="flex items-center justify-between mb-8">
                         <h1 className="text-3xl font-bold">All Recipes</h1>
                         <Badge variant="outline" className="text-sm">
