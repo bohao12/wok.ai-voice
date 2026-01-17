@@ -5,7 +5,7 @@ import { useConversation } from '@elevenlabs/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Volume2, VolumeX, Loader2 } from 'lucide-react'
+import { Volume2, VolumeX, Loader2, Mic, Sparkles, MessageSquare, HelpCircle, FastForward, Rewind, RotateCcw } from 'lucide-react'
 
 interface Recipe {
   id: string
@@ -33,10 +33,8 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
   const [transcript, setTranscript] = useState<string>('')
   const [agentResponse, setAgentResponse] = useState<string>('')
 
-  // Ref to track source of step change to prevent double-speaking or loops
+  // Refs to track state without triggering re-renders of the hook
   const lastChangeSource = useRef<'user' | 'agent'>('user')
-
-  // Ref to track callbacks and recipe to avoid stale closures in tools
   const currentStepRef = useRef(currentStep)
   const onStepChangeRef = useRef(onStepChange)
   const onTimerRequestRef = useRef(onTimerRequest)
@@ -47,14 +45,12 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
     onStepChangeRef.current = onStepChange
     onTimerRequestRef.current = onTimerRequest
     recipeRef.current = recipe
-    console.log(`[VoiceAssistant] Step changed: ${currentStepRef.current} -> ${currentStep}`)
     currentStepRef.current = currentStep
   }, [currentStep, onStepChange, onTimerRequest, recipe])
 
   // Define client tools that the agent can call
   const clientTools = useMemo(() => ({
     nextStep: () => {
-      console.log('Tool called: nextStep')
       lastChangeSource.current = 'agent'
       const step = currentStepRef.current
       const r = recipeRef.current
@@ -67,7 +63,6 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
       return 'Already at the last step'
     },
     previousStep: () => {
-      console.log('Tool called: previousStep')
       lastChangeSource.current = 'agent'
       const step = currentStepRef.current
       const r = recipeRef.current
@@ -80,21 +75,16 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
       return 'Already at the first step'
     },
     repeatStep: () => {
-      console.log('Tool called: repeatStep')
       const step = currentStepRef.current
       const r = recipeRef.current
-      // Trigger re-announcement
       onStepChangeRef.current(step)
-      return `Staying on step ${step + 1}. The instruction is: ${r.steps[step]}`
+      return `Current step ${step + 1}: ${r.steps[step]}`
     },
     setTimer: ({ minutes }: { minutes: number }) => {
-      console.log('Tool called: setTimer with minutes:', minutes)
       onTimerRequestRef.current(minutes, `Step ${currentStepRef.current + 1}`)
       return `Timer set for ${minutes} minutes`
     },
     changeStep: (args: any) => {
-      console.log('Tool called: changeStep with args:', args)
-
       let rawStep: any = undefined
       if (typeof args === 'number' || typeof args === 'string') {
         rawStep = args
@@ -103,301 +93,210 @@ export function VoiceAssistant({ recipe, currentStep, completedSteps, onStepChan
       }
 
       const stepNum = parseInt(String(rawStep))
-      console.log('Resolved step number:', stepNum)
-
       if (isNaN(stepNum)) {
-        return `Error: Could not determine step number from input. Please use { "step": number }.`
+        return `Error: Could not determine step number`
       }
 
       const r = recipeRef.current
       const targetIndex = stepNum - 1
 
       if (targetIndex >= 0 && targetIndex < r.steps.length) {
-        console.log(`Executing jump to index ${targetIndex}`)
         onStepChangeRef.current(targetIndex)
         return `Moved to step ${stepNum}. The instruction is: ${r.steps[targetIndex]}`
       }
-      return `Step ${stepNum} does not exist. Please specify a step between 1 and ${r.steps.length}`
+      return `Step ${stepNum} does not exist.`
     },
+  }), [])
 
-  }), [recipe, currentStep, onStepChange, onTimerRequest])
-
-  const recipeContext = useMemo(() => {
-    // We provide the FULL recipe context initially.
-    // We DO NOT include the dynamic "currentStep" here to avoid re-creating the prompt and restarting the session.
-    // The agent will track the step via the conversation history and tool outputs.
-
-    const ingredientsList = recipe.ingredients
-      .map((ing, i) => `${i + 1}. ${ing}`)
-      .join('\n')
-
-    const stepsList = recipe.steps
-      .map((step, i) => `Step ${i + 1}: ${step}`)
-      .join('\n')
-
-    const timingInfo = recipe.timing
-      ? `Timing: Prep ${recipe.timing.prep || 0} min, Cook ${recipe.timing.cook || 0} min, Total ${recipe.timing.total || 0} min`
-      : ''
-
-    const techniquesList = recipe.techniques && recipe.techniques.length > 0
-      ? `Techniques used: ${recipe.techniques.join(', ')}`
-      : ''
+  // Prompt configuration
+  const recipePrompt = useMemo(() => {
+    const ingredientsList = recipe.ingredients.map((ing, i) => `${i + 1}. ${ing}`).join('\n')
+    const stepsList = recipe.steps.map((step, i) => `Step ${i + 1}: ${step}`).join('\n')
 
     return `You are helping the user cook "${recipe.title}". 
     
-**All Ingredients:**
+**Ingredients:**
 ${ingredientsList}
 
-**All Steps:**
+**Steps:**
 ${stepsList}
-
-${timingInfo}
-${techniquesList}
 
 ## Your Role:
 - You help the user cook "${recipe.title}".
-- You have FULL control to navigate to ANY step using the tool "changeStep". This tool updates the user's screen.
-- Answer questions about ingredients, techniques, and steps.
+- Use "changeStep" to update the UI when the user moves between steps.
+- Answer questions about ingredients and steps.
 
 ## Tools:
 - repeatStep(): Read current step again
-- changeStep({ step: number }): Move to a specific step number. Example: call changeStep with argument { "step": 3 } to go to step 3.
+- changeStep({ step: number }): Move to a specific step number.`
+  }, [recipe.title, recipe.ingredients, recipe.steps])
 
-IMPORTANT: Always check if the step number has changed. If it has, you MUST call changeStep with the new step number such that the user's UI is synced.
-- For example, { "step": 3 } when the new step number is step 3.
-
-When you move to a new step (via any tool), the tool will return the text of that step. READ that text to the user naturally.`
-  }, [recipe])
-
-  // Initialize the conversation with the ElevenLabs React SDK
   const conversation = useConversation({
     clientTools,
-    overrides: {
-      agent: {
-        prompt: {
-          prompt: recipeContext
-        },
-        firstMessage: `Hi! I'm your cooking assistant for ${recipe.title}. You're currently on step ${currentStep + 1}. How can I help you?`
-      }
-    },
     onConnect: () => {
-      console.log('✓ Connected to ElevenLabs')
+      console.log('Voice assistant connected')
       setError(null)
     },
     onDisconnect: () => {
-      console.log('Disconnected from ElevenLabs')
+      console.log('Voice assistant disconnected')
     },
     onError: (error: any) => {
       console.error('Conversation error:', error)
       setError(typeof error === 'string' ? error : (error as Error).message || 'Connection error occurred')
     },
     onMessage: (message: any) => {
-      console.log('Message received:', message)
-
-
-      // Handle user transcripts
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((message as any).type === 'user_transcript' || (message as any).type === 'user_transcription') {
-        const text = (message as any).user_transcription?.text || (message as any).message || ''
-        if (text) {
-          setTranscript(text)
-        }
+      if (message.type === 'user_transcript' || message.type === 'user_transcription') {
+        const text = message.user_transcription?.text || message.message || ''
+        if (text) setTranscript(text)
       }
-
-
-      // Handle agent responses
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((message as any).type === 'agent_response') {
-        const text = (message as any).agent_response || (message as any).message || ''
-        if (text) {
-          setAgentResponse(text)
-        }
+      if (message.type === 'agent_response') {
+        const text = message.agent_response || message.message || ''
+        if (text) setAgentResponse(text)
       }
     }
   })
 
-
-  // Cleanup on unmount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    return () => {
-      // Cleanup function when component unmounts
-      if (conversation.status === 'connected') {
-        console.log('Component unmounting, ending session...')
-        conversation.endSession()
-      }
-    }
-  }, [])
-
-  // Start the conversation
   const startConversation = async () => {
     try {
       setError(null)
-
-
-      // Request microphone permissions first
-      const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      // Stop the tracks immediately as we only needed to request permission
-      permissionStream.getTracks().forEach(track => track.stop())
-
-      // Get signed URL from our API
+      // Get signed URL
       const response = await fetch('/api/conversation/signed-url')
-      if (!response.ok) {
-        throw new Error('Failed to get signed URL')
-      }
-
-
+      if (!response.ok) throw new Error('Could not get signed URL')
       const { signedUrl } = await response.json()
 
-
-      if (!signedUrl) {
-        throw new Error('No signed URL returned')
-      }
-
-      console.log('Starting conversation with signed URL')
-
-      // Start the session with WebSocket
+      // Start session with overrides
       await conversation.startSession({
         signedUrl,
+        overrides: {
+          agent: {
+            prompt: { prompt: recipePrompt },
+            firstMessage: `Hi! I'm your assistant for ${recipe.title}. You're on step ${currentStepRef.current + 1}. How can I help?`
+          }
+        }
       })
-
     } catch (error) {
-      console.error('Failed to start conversation:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to start voice assistant'
-      setError(errorMessage)
+      setError(error instanceof Error ? error.message : 'Failed to start')
     }
   }
 
-  // Stop the conversation
   const stopConversation = async () => {
     await conversation.endSession()
   }
 
-  // Toggle conversation on/off
   const toggleConversation = async () => {
-    if (conversation.status === 'connected') {
-      await stopConversation()
-    } else {
-      await startConversation()
-    }
+    if (conversation.status === 'connected') await stopConversation()
+    else await startConversation()
   }
 
   const isActive = conversation.status === 'connected'
   const isConnecting = conversation.status === 'connecting'
   const isSpeaking = conversation.isSpeaking
 
-  // Ref to track previous step to prevent spurious interruptions
-  const prevStepRef = useRef(currentStep)
-
-  // Detect when currentStep changes from the outside (UI buttons)
-  // and handle interruption of the voice assistant
+  // Update effect for manual step changes
   useEffect(() => {
-    if (isActive) {
-      // Check if step actually changed
-      const stepChanged = prevStepRef.current !== currentStep
-
-      if (stepChanged) {
-        // Update ref
-        prevStepRef.current = currentStep
-
-        // If the change wasn't triggered by the agent (via tools), it's a manual user action
-        if (lastChangeSource.current === 'user') {
-          // Send a message to the agent to:
-          // 1. Interrupt current speech (implicit in sending a new user message)
-          // 2. Force the agent to acknowledge the new step and read it
-          // 3. EXPLICITLY tell it not to call tools, to prevent a feedback loop
-
-          const isCompleted = completedSteps.has(currentStep)
-          const completionNote = isCompleted ? " NOTE: The user has already marked this step as completed." : ""
-
-          conversation.sendUserMessage(`SYSTEM UPDATE: The user has manually moved to step ${currentStep + 1}.${completionNote} Do NOT call any navigation tools. Just stop speaking and read the instruction for step ${currentStep + 1}.`)
-        }
-
-        // Reset the source to 'user' for the next potential interaction
-        lastChangeSource.current = 'user'
-      }
-    } else {
-      // Keep ref in sync even if not active
-      prevStepRef.current = currentStep
+    if (isActive && lastChangeSource.current === 'user') {
+      conversation.sendUserMessage(`SYSTEM: User moved to step ${currentStep + 1}. Read this step: ${recipe.steps[currentStep]}`)
     }
-  }, [currentStep, isActive, conversation, completedSteps])
+    lastChangeSource.current = 'user'
+  }, [currentStep, isActive, recipe.steps])
 
   return (
     <div data-assistant-active={isActive}>
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">AI Voice Assistant</h3>
+      <Card className={`rounded-[2rem] overflow-hidden border-2 transition-all duration-500 shadow-lg ${isActive ? 'border-primary shadow-primary/20 bg-primary/5' : 'border-border/50 bg-white dark:bg-card'}`}>
+        <CardContent className="p-8">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl transition-colors ${isActive ? 'bg-primary text-white scale-110 shadow-lg shadow-primary/30' : 'bg-muted text-muted-foreground'}`}>
+                <Mic className={`h-6 w-6 ${isActive && isSpeaking ? 'animate-pulse' : ''}`} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black">AI Voice Assistant</h3>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-0.5">Hands-free Cooking</p>
+              </div>
+            </div>
             {isActive && (
-              <Badge variant="default" className={isSpeaking ? 'animate-pulse' : ''}>
-                {isSpeaking ? 'Speaking' : 'Listening'}
+              <Badge variant="default" className={`bg-primary text-white border-none px-4 py-1.5 font-black uppercase tracking-widest text-[10px] rounded-full ${isSpeaking ? 'animate-pulse' : ''}`}>
+                {isSpeaking ? 'Agent Speaking' : 'Listening...'}
               </Badge>
             )}
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             <Button
               onClick={toggleConversation}
               disabled={isConnecting}
               size="lg"
-              className="w-full"
-              variant={isActive ? "destructive" : "default"}
+              className={`w-full rounded-2xl h-16 text-xl font-bold shadow-xl transition-all active:scale-95 ${isActive ? "bg-white text-destructive border-2 border-destructive/20 hover:bg-destructive/5 shadow-destructive/10" : "bg-primary text-white shadow-primary/30"}`}
+              variant={isActive ? "outline" : "default"}
             >
               {isConnecting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connecting...
+                  <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                  Establishing Link...
                 </>
               ) : isActive ? (
                 <>
-                  <VolumeX className="mr-2 h-4 w-4" />
-                  Stop Voice Assistant
+                  <VolumeX className="mr-3 h-6 w-6" />
+                  Deactivate AI
                 </>
               ) : (
                 <>
-                  <Volume2 className="mr-2 h-4 w-4" />
-                  Start Voice Assistant
+                  <Volume2 className="mr-3 h-6 w-6" />
+                  Activate AI Guide
                 </>
               )}
             </Button>
 
             {error && (
-              <div className="p-3 bg-destructive/10 rounded-md border border-destructive/20">
-                <p className="text-sm text-destructive">{error}</p>
+              <div className="p-4 bg-destructive/10 rounded-2xl border-2 border-destructive/20 animate-in fade-in slide-in-from-top-2">
+                <p className="text-sm text-destructive font-bold">
+                  Error: {error}
+                </p>
               </div>
             )}
 
-            {transcript && (
-              <div className="p-3 bg-muted rounded-md">
-                <p className="text-sm text-muted-foreground mb-1">You said:</p>
-                <p className="text-sm">{transcript}</p>
+            {(transcript || agentResponse) && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 transition-all duration-700">
+                {transcript && (
+                  <div className="flex gap-3 items-start justify-end">
+                    <div className="p-4 bg-white/80 dark:bg-background/80 rounded-[1.5rem] rounded-tr-none shadow-sm border border-border/50 max-w-[85%]">
+                      <p className="text-xs text-muted-foreground font-black uppercase tracking-tighter mb-1.5 flex items-center gap-1.5">
+                        <MessageSquare className="h-3 w-3" /> You
+                      </p>
+                      <p className="text-sm font-medium italic">&quot;{transcript}&quot;</p>
+                    </div>
+                  </div>
+                )}
+
+                {agentResponse && (
+                  <div className="flex gap-3 items-start">
+                    <div className="p-4 bg-primary text-white rounded-[1.5rem] rounded-tl-none shadow-lg shadow-primary/20 max-w-[85%]">
+                      <p className="text-xs text-white/60 font-black uppercase tracking-tighter mb-1.5 flex items-center gap-1.5">
+                        <Sparkles className="h-3 w-3 fill-white/20" /> Assistant
+                      </p>
+                      <p className="text-sm font-bold leading-relaxed">{agentResponse}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {agentResponse && (
-              <div className="p-3 bg-primary/10 rounded-md border border-primary/20">
-                <p className="text-sm text-muted-foreground mb-1">Assistant:</p>
-                <p className="text-sm">{agentResponse}</p>
+            <div className="border-t border-border/50 pt-6">
+              <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-4 text-center">Voice Command Guide</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { icon: <FastForward className="h-3.5 w-3.5" />, label: "Next Step" },
+                  { icon: <Rewind className="h-3.5 w-3.5" />, label: "Go Back" },
+                  { icon: <RotateCcw className="h-3.5 w-3.5" />, label: "Repeat Step" },
+                  { icon: <HelpCircle className="h-3.5 w-3.5" />, label: "Any Question" },
+                ].map((cmd, i) => (
+                  <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/50 dark:bg-card/50 border border-border/50 transition-colors hover:bg-white dark:hover:bg-card">
+                    <div className="text-primary">{cmd.icon}</div>
+                    <span className="text-xs font-bold">{cmd.label}</span>
+                  </div>
+                ))}
               </div>
-            )}
-
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p className="font-semibold">Try saying:</p>
-              <ul className="list-disc list-inside space-y-0.5">
-                <li>&quot;Next step&quot; - Move forward</li>
-                <li>&quot;Previous step&quot; - Go back</li>
-                <li>&quot;Repeat that&quot; - Hear current step again</li>
-                <li>&quot;Set timer for X minutes&quot; - Start timer</li>
-                <li>&quot;What is [ingredient]?&quot; - Get info</li>
-                <li>&quot;How do I [technique]?&quot; - Get help</li>
-              </ul>
             </div>
-
-            {conversation.status === 'disconnected' && (
-              <div className="text-xs text-muted-foreground">
-                <p>💡 <strong>Tip:</strong> Make sure your microphone is enabled and you&apos;re in a quiet environment for best results.</p>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
